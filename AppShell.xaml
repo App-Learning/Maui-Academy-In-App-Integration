@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="MauiAcademyApp.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:MauiAcademyApp.Pages"
+    Shell.FlyoutBehavior="Disabled"
+    Shell.TabBarBackgroundColor="{StaticResource White}"
+    Shell.TabBarForegroundColor="{StaticResource Primary}"
+    Shell.TabBarUnselectedColor="{StaticResource Black}">
+
+    <TabBar x:Name="MainTabBar">
+        <Tab Title="Home" Icon="icon_home.svg" Route="homeTab">
+            <ShellContent
+                ContentTemplate="{DataTemplate pages:HomePage}"
+                Route="home" />
+        </Tab>
+
+        <Tab Title="Courses" Icon="icon_courses.svg" Route="coursesTab">
+            <ShellContent
+                ContentTemplate="{DataTemplate pages:CoursesPage}"
+                Route="courses" />
+        </Tab>
+
+        <Tab Title="Academy" Icon="icon_academy.svg" Route="academyTab">
+            <ShellContent
+                x:Name="AcademyShellContent"
+                Route="academy" />
+        </Tab>
+    </TabBar>
+</Shell>

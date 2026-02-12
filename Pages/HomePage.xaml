@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MauiAcademyApp.Pages.HomePage"
+             Title="Home">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+            <Label Text="Academy App"
+                   FontSize="28"
+                   FontAttributes="Bold" />
+            <Label Text="Tab 1 placeholder. Use this for dashboard content." />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
