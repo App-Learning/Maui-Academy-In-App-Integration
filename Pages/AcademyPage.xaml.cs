@@ -1,7 +1,9 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Maui;
 using Microsoft.Maui.ApplicationModel;
+using Microsoft.Maui.Platform;
 
 namespace MauiAcademyApp.Pages;
 
@@ -17,6 +19,7 @@ public partial class AcademyPage : ContentPage
     private const string MessageHost = "maui-bridge://message";
 
     private readonly List<string> _messageHistory = new();
+    private bool _preloaded;
 
     private static readonly IReadOnlyList<string> BridgeScriptSteps =
     [
@@ -71,6 +74,52 @@ public partial class AcademyPage : ContentPage
             var request = new Foundation.NSMutableUrlRequest(new Foundation.NSUrl(AcademyUrl));
             request["token"] = JwtToken;
             nativeWebView.LoadRequest(request);
+        }
+#else
+        AcademyWebView.Source = AcademyUrl;
+#endif
+    }
+
+    public void Preload(IMauiContext? preferredContext)
+    {
+        if (_preloaded)
+        {
+            return;
+        }
+
+        var mauiContext = preferredContext
+            ?? AcademyWebView.Handler?.MauiContext
+            ?? Handler?.MauiContext
+            ?? (Application.Current?.Windows.Count > 0
+                ? Application.Current.Windows[0].Page?.Handler?.MauiContext
+                : null);
+        if (mauiContext is null)
+        {
+            return;
+        }
+
+        if (AcademyWebView.Handler is null)
+        {
+            AcademyWebView.ToHandler(mauiContext);
+        }
+
+        _preloaded = true;
+
+        if (UseJwtToken)
+        {
+            LoadAcademyWithJwtHeader();
+            return;
+        }
+
+#if ANDROID
+        var androidWebView = AcademyWebView.Handler?.PlatformView as Android.Webkit.WebView;
+        androidWebView?.LoadUrl(AcademyUrl);
+#elif IOS || MACCATALYST
+        var iosWebView = AcademyWebView.Handler?.PlatformView as WebKit.WKWebView;
+        if (iosWebView is not null)
+        {
+            var request = new Foundation.NSUrlRequest(new Foundation.NSUrl(AcademyUrl));
+            iosWebView.LoadRequest(request);
         }
 #else
         AcademyWebView.Source = AcademyUrl;
