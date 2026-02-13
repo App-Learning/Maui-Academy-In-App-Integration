@@ -8,8 +8,12 @@ namespace MauiAcademyApp.Pages;
 public partial class AcademyPage : ContentPage
 {
     private const string AcademyBaseUrl = "https://your-academy-domain.example/inapp";
-    private const string AcademyUserId = "1241";
-    private static string AcademyUrl => $"{AcademyBaseUrl}?userID={Uri.EscapeDataString(AcademyUserId)}";
+    private const string AcademyUserId = "put-the-user-id-here";
+    private static readonly bool UseJwtToken = false;
+    private static string AcademyUrl => UseJwtToken
+        ? AcademyBaseUrl
+        : $"{AcademyBaseUrl}?userID={Uri.EscapeDataString(AcademyUserId)}";
+    private const string JwtToken = "put-your-jwt-token-here";
     private const string MessageHost = "maui-bridge://message";
 
     private readonly List<string> _messageHistory = new();
@@ -53,7 +57,51 @@ public partial class AcademyPage : ContentPage
     public AcademyPage()
     {
         InitializeComponent();
+
+        if (UseJwtToken)
+        {
+            AcademyWebView.Source = "about:blank";
+            AcademyWebView.HandlerChanged += OnAcademyWebViewHandlerChanged;
+        }
+        else
+        {
+            AcademyWebView.Source = AcademyUrl;
+        }
+    }
+
+    private void OnAcademyWebViewHandlerChanged(object? sender, EventArgs e)
+    {
+        if (!UseJwtToken)
+        {
+            return;
+        }
+
+        LoadAcademyWithJwtHeader();
+    }
+
+    private void LoadAcademyWithJwtHeader()
+    {
+#if ANDROID
+        var nativeWebView = AcademyWebView.Handler?.PlatformView as Android.Webkit.WebView;
+        if (nativeWebView is not null)
+        {
+            var headers = new Dictionary<string, string>
+            {
+                ["token"] = JwtToken
+            };
+            nativeWebView.LoadUrl(AcademyUrl, headers);
+        }
+#elif IOS || MACCATALYST
+        var nativeWebView = AcademyWebView.Handler?.PlatformView as WebKit.WKWebView;
+        if (nativeWebView is not null)
+        {
+            var request = new Foundation.NSMutableUrlRequest(new Foundation.NSUrl(AcademyUrl));
+            request.SetValueForHTTPHeaderField(JwtToken, "token");
+            nativeWebView.LoadRequest(request);
+        }
+#else
         AcademyWebView.Source = AcademyUrl;
+#endif
     }
 
     private void OnAcademyWebViewNavigating(object? sender, WebNavigatingEventArgs e)
