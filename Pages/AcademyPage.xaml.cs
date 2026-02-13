@@ -18,41 +18,14 @@ public partial class AcademyPage : ContentPage
 
     private readonly List<string> _messageHistory = new();
 
-    private static readonly string BridgeScript = """
-(function () {
-  if (window.__mauiBridgeInstalled) return;
-  window.__mauiBridgeInstalled = true;
-
-  function toMessageString(payload) {
-    if (typeof payload === 'string') return payload;
-    try {
-      return JSON.stringify(payload);
-    } catch {
-      return String(payload);
-    }
-  }
-
-  function sendToNative(payload) {
-    var encoded = encodeURIComponent(toMessageString(payload));
-    window.location.href = 'maui-bridge://message?data=' + encoded;
-  }
-
-  window.ReactNativeWebView = window.ReactNativeWebView || {};
-  window.ReactNativeWebView.postMessage = sendToNative;
-
-  var originalPostMessage = window.postMessage;
-  window.postMessage = function (message, targetOrigin, transfer) {
-    sendToNative(message);
-    if (typeof originalPostMessage === 'function') {
-      return originalPostMessage.apply(window, arguments);
-    }
-  };
-
-  window.MauiBridge = {
-    postMessage: sendToNative
-  };
-})();
-""";
+    private static readonly IReadOnlyList<string> BridgeScriptSteps =
+    [
+        "window.__mauiBridgeInstalled===true?'already-installed':'continue';",
+        "window.__mauiBridgePostToNative=function(payload){var s='';try{s=typeof payload==='string'?payload:JSON.stringify(payload);}catch(e){s=String(payload);}window.location.href='maui-bridge://message?data='+encodeURIComponent(s);return s;};'post-fn-ready';",
+        "window.ReactNativeWebView=(typeof window.ReactNativeWebView==='object'&&window.ReactNativeWebView!==null)?window.ReactNativeWebView:{};window.ReactNativeWebView.postMessage=window.__mauiBridgePostToNative;'rn-ready';",
+        "window.MauiBridge=(typeof window.MauiBridge==='object'&&window.MauiBridge!==null)?window.MauiBridge:{};window.MauiBridge.postMessage=window.__mauiBridgePostToNative;'maui-ready';",
+        "window.__mauiBridgeInstalled=true;'installed';"
+    ];
 
     public AcademyPage()
     {
@@ -96,7 +69,7 @@ public partial class AcademyPage : ContentPage
         if (nativeWebView is not null)
         {
             var request = new Foundation.NSMutableUrlRequest(new Foundation.NSUrl(AcademyUrl));
-            request.SetValueForHTTPHeaderField(JwtToken, "token");
+            request["token"] = JwtToken;
             nativeWebView.LoadRequest(request);
         }
 #else
@@ -132,12 +105,48 @@ public partial class AcademyPage : ContentPage
 
         try
         {
-            await AcademyWebView.EvaluateJavaScriptAsync(BridgeScript);
+            var bridgeResult = await InstallBridgeAsync();
+
+            if (bridgeResult.StartsWith("bridge-error:", StringComparison.OrdinalIgnoreCase))
+            {
+                LastMessageLabel.Text = $"Bridge injection failed: {bridgeResult}";
+            }
         }
         catch (Exception ex)
         {
             LastMessageLabel.Text = $"Bridge injection failed: {ex.Message}";
         }
+    }
+
+    private async Task<string> InstallBridgeAsync()
+    {
+        string first;
+        try
+        {
+            first = await AcademyWebView.EvaluateJavaScriptAsync(BridgeScriptSteps[0]) ?? string.Empty;
+            if (string.Equals(first, "already-installed", StringComparison.OrdinalIgnoreCase))
+            {
+                return "already-installed";
+            }
+        }
+        catch (Exception ex)
+        {
+            return $"bridge-error:step-0:{ex.Message}";
+        }
+
+        for (var i = 1; i < BridgeScriptSteps.Count; i++)
+        {
+            try
+            {
+                var stepResult = await AcademyWebView.EvaluateJavaScriptAsync(BridgeScriptSteps[i]) ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                return $"bridge-error:step-{i}:{ex.Message}";
+            }
+        }
+
+        return "installed";
     }
 
     private void OnAcademyMessageReceived(string message)
@@ -179,7 +188,19 @@ public partial class AcademyPage : ContentPage
             Action = action,
             Value = value
         });
-        var script = $"window.postMessage({JsonSerializer.Serialize(payload)}, '*');";
+        var script = $$"""
+        (function () {
+          var data = {{JsonSerializer.Serialize(payload)}};
+          if (typeof MessageEvent === 'function') {
+            window.dispatchEvent(new MessageEvent('message', { data: data }));
+            return;
+          }
+
+          if (typeof window.postMessage === 'function') {
+            window.postMessage(data, '*');
+          }
+        })();
+        """;
 
         try
         {
