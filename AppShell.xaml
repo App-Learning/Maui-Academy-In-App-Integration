@@ -10,19 +10,19 @@
     Shell.TabBarUnselectedColor="{StaticResource Black}">
 
     <TabBar x:Name="MainTabBar">
-        <Tab Title="Home" Icon="icon_home.svg" Route="homeTab">
+        <Tab x:Name="HomeTab" Title="Home" Icon="icon_home.png" Route="homeTab">
             <ShellContent
                 ContentTemplate="{DataTemplate pages:HomePage}"
                 Route="home" />
         </Tab>
 
-        <Tab Title="Courses" Icon="icon_courses.svg" Route="coursesTab">
+        <Tab Title="Courses" Icon="icon_courses.png" Route="coursesTab">
             <ShellContent
                 ContentTemplate="{DataTemplate pages:CoursesPage}"
                 Route="courses" />
         </Tab>
 
-        <Tab Title="Academy" Icon="icon_academy.svg" Route="academyTab">
+        <Tab Title="Academy" Icon="icon_academy.png" Route="academyTab">
             <ShellContent
                 x:Name="AcademyShellContent"
                 Route="academy" />
