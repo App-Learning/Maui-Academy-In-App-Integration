@@ -80,11 +80,11 @@ public partial class AcademyPage : ContentPage
 #endif
     }
 
-    public void Preload(IMauiContext? preferredContext)
+    public bool Preload(IMauiContext? preferredContext)
     {
         if (_preloaded)
         {
-            return;
+            return true;
         }
 
         var mauiContext = preferredContext
@@ -95,7 +95,17 @@ public partial class AcademyPage : ContentPage
                 : null);
         if (mauiContext is null)
         {
-            return;
+            return false;
+        }
+
+        if (Handler is null)
+        {
+            this.ToHandler(mauiContext);
+        }
+
+        if (Handler is null)
+        {
+            return false;
         }
 
         if (AcademyWebView.Handler is null)
@@ -103,12 +113,17 @@ public partial class AcademyPage : ContentPage
             AcademyWebView.ToHandler(mauiContext);
         }
 
+        if (AcademyWebView.Handler is null)
+        {
+            return false;
+        }
+
         _preloaded = true;
 
         if (UseJwtToken)
         {
             LoadAcademyWithJwtHeader();
-            return;
+            return true;
         }
 
 #if ANDROID
@@ -124,6 +139,7 @@ public partial class AcademyPage : ContentPage
 #else
         AcademyWebView.Source = AcademyUrl;
 #endif
+        return true;
     }
 
     private void OnAcademyWebViewNavigating(object? sender, WebNavigatingEventArgs e)

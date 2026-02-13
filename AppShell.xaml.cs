@@ -1,11 +1,18 @@
 using MauiAcademyApp.Pages;
+using Microsoft.Maui;
 using Microsoft.Maui.ApplicationModel;
 
 namespace MauiAcademyApp;
 
 public partial class AppShell : Shell
 {
+    private const int AcademyPreloadIntervalMs = 100;
+    private const int MaxAcademyPreloadAttempts = 100;
+
     private readonly AcademyPage _academyPage = new();
+    private int _academyPreloadAttempts;
+    private bool _academyPreloadTimerRunning;
+    private bool _academyPreloaded;
 
     public AppShell()
     {
@@ -13,53 +20,60 @@ public partial class AppShell : Shell
         AcademyShellContent.Content = _academyPage;
         CurrentItem = HomeTab;
         Loaded += OnLoaded;
+        HandlerChanged += OnHandlerChanged;
+        TryStartAcademyPreloadTimer();
     }
 
     private void OnLoaded(object? sender, EventArgs e)
     {
         Loaded -= OnLoaded;
-#if ANDROID
-        _ = WarmupAcademyByTabSwitchAsync();
-#else
-        _ = PreloadAcademyAsync();
-#endif
+        TryStartAcademyPreloadTimer();
     }
 
-// TODO: Hacky workaround on Android to make initial Academy loading smooth --> should be fixed by WebView2 on Android when it becomes available in .NET MAUI. See
-#if ANDROID
-    private async Task WarmupAcademyByTabSwitchAsync()
+    private void OnHandlerChanged(object? sender, EventArgs e)
     {
-        try
-        {
-            await Task.Yield();
-            await GoToAsync("//academy", false);
-            await Task.Delay(10);
-            await GoToAsync("//home", false);
-        }
-        catch
-        {
-            // Best-effort warmup only.
-        }
+        TryStartAcademyPreloadTimer();
     }
-#endif
 
-    private async Task PreloadAcademyAsync()
+    private void TryStartAcademyPreloadTimer()
     {
-        // Give Shell handler/context a brief moment to become fully available.
-        for (var attempt = 0; attempt < 5; attempt++)
+        if (_academyPreloaded || _academyPreloadTimerRunning)
         {
-            var mauiContext = Handler?.MauiContext;
-            if (mauiContext is not null)
-            {
-                _academyPage.Preload(mauiContext);
-                return;
-            }
-
-            await Task.Delay(100);
+            return;
         }
 
-        // Final best-effort attempt with any available context.
-        _academyPage.Preload(null);
+        if (Dispatcher is null)
+        {
+            return;
+        }
+
+        _academyPreloadTimerRunning = true;
+        Dispatcher.StartTimer(
+            TimeSpan.FromMilliseconds(AcademyPreloadIntervalMs),
+            TryPreloadAcademy);
+    }
+
+    private bool TryPreloadAcademy()
+    {
+        _academyPreloadAttempts++;
+
+        _academyPreloaded = _academyPage.Preload(ResolveMauiContext());
+        if (_academyPreloaded || _academyPreloadAttempts >= MaxAcademyPreloadAttempts)
+        {
+            _academyPreloadTimerRunning = false;
+            return false;
+        }
+
+        return true;
+    }
+
+    private IMauiContext? ResolveMauiContext()
+    {
+        return Handler?.MauiContext
+            ?? _academyPage.Handler?.MauiContext
+            ?? (Application.Current?.Windows.Count > 0
+                ? Application.Current.Windows[0].Page?.Handler?.MauiContext
+                : null);
     }
 
     public void SetBottomTabBarVisible(bool visible)
